@@ -1,0 +1,9 @@
+.venv/
+tv_content/
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.webm
+*.m4v
+.DS_Store
