@@ -1,0 +1,9 @@
+# virtualenv
+.venv/
+
+# media files
+tv_content/
+*.mp4
+
+# macOS
+.DS_Store
