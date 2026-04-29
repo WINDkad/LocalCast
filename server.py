@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pathlib import Path
 import shutil
 
@@ -117,6 +117,24 @@ def admin_panel():
                         Файлы в папке common
                     </h2>
 
+                    <form action="/delete-all"
+                          method="post"
+                          style="margin-bottom:20px;">
+
+                        <button type="submit"
+                                onclick="return confirm('Удалить все файлы из папки common?')"
+                                style="background:#b91c1c;
+                                       color:white;
+                                       border:none;
+                                       padding:12px 24px;
+                                       border-radius:10px;
+                                       font-size:15px;
+                                       cursor:pointer;">
+
+                            Удалить все файлы
+                        </button>
+                    </form>
+
                     {file_list_html if file_list_html else '<p style="color:#64748b;">Файлы пока не загружены</p>'}
                 </div>
 
@@ -205,6 +223,16 @@ def delete_file(filename: str):
         file_path.unlink()
 
     return {"status": "deleted"}
+
+
+@app.post("/delete-all")
+def delete_all_files():
+    if COMMON_DIR.exists():
+        for file in COMMON_DIR.iterdir():
+            if file.is_file():
+                file.unlink()
+
+    return RedirectResponse(url="/admin", status_code=303)
 
 
 @app.get("/health")
