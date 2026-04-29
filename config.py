@@ -8,8 +8,17 @@ HOST: str = "0.0.0.0"
 PORT: int = 8000
 
 # Разрешённые расширения видео (можно дополнять)
-ALLOWED_EXTENSIONS: set[str] = {
-    ".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"
+ALLOWED_EXTENSIONS = {
+    ".mp4",
+    ".mkv",
+    ".avi",
+    ".mov",
+    ".webm",
+    ".m4v",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp"
 }
 
 # Если хочешь жёстко задать базовый URL (обычно НЕ нужно):
