@@ -1,17 +1,22 @@
-from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, PlainTextResponse
 from pathlib import Path
 import shutil
 
+from config import MEDIA_ROOT, PUBLIC_BASE_URL, HOST, PORT
+from media_lib import (
+    list_common_items,
+    build_m3u,
+    safe_resolve_media_path,
+)
+
 app = FastAPI(title="LocalCast", version="1.0")
 
-# Корневая папка хранения контента
-MEDIA_ROOT = Path("tv_content")
 COMMON_DIR = MEDIA_ROOT / "common"
-
-# Автосоздание папок
 COMMON_DIR.mkdir(parents=True, exist_ok=True)
 
+
+# ================= ADMIN =================
 
 @app.get("/admin", response_class=HTMLResponse)
 def admin_panel():
@@ -205,49 +210,75 @@ def admin_panel():
 
 
 @app.post("/admin/upload")
-def upload_file(files: list[UploadFile] = File(...)):
+def upload(files: list[UploadFile] = File(...)):
     for file in files:
-        file_path = COMMON_DIR / file.filename
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-    return {"status": "success"}
+        with open(COMMON_DIR / file.filename, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+    return {"ok": True}
 
 
 @app.get("/admin/delete/{filename}")
 def delete_file(filename: str):
-    file_path = COMMON_DIR / filename
-
-    if file_path.exists() and file_path.is_file():
-        file_path.unlink()
-
-    return {"status": "deleted"}
+    path = COMMON_DIR / filename
+    if path.exists():
+        path.unlink()
+    return {"deleted": True}
 
 
 @app.post("/delete-all")
-def delete_all_files():
-    if COMMON_DIR.exists():
-        for file in COMMON_DIR.iterdir():
-            if file.is_file():
-                file.unlink()
+def delete_all():
+    for f in COMMON_DIR.iterdir():
+        if f.is_file():
+            f.unlink()
+    return RedirectResponse("/admin", status_code=303)
 
-    return RedirectResponse(url="/admin", status_code=303)
 
+# ================= PLAYLIST =================
+
+@app.get("/playlist/common.m3u", response_class=PlainTextResponse)
+def playlist_common():
+    items = list_common_items()
+
+    base_url = PUBLIC_BASE_URL or f"http://{HOST}:{PORT}"
+
+    urls = [
+        f"{base_url}/media/common/{item.filename}"
+        for item in items
+    ]
+
+    return build_m3u(urls)
+
+
+# ================= MEDIA =================
+
+@app.get("/media/common/{filename}")
+def media_common(filename: str):
+    try:
+        path = safe_resolve_media_path("common", None, filename)
+    except Exception:
+        raise HTTPException(status_code=403)
+
+    if not path.exists():
+        raise HTTPException(status_code=404)
+
+    return FileResponse(path)
+
+
+# ================= HEALTH =================
 
 @app.get("/health")
 def health():
     return "OK"
 
 
+# ================= RUN =================
+
 if __name__ == "__main__":
     import uvicorn
 
-    (MEDIA_ROOT / "common").mkdir(parents=True, exist_ok=True)
-
     uvicorn.run(
         "server:app",
-        host="0.0.0.0",
-        port=8000,
+        host=HOST,
+        port=PORT,
         reload=True
     )
