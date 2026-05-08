@@ -1,13 +1,27 @@
+import socket
 from pathlib import Path
 
-# Корневая папка с контентом (по умолчанию рядом с проектом)
+def get_local_ip():
+    """Автоматически определяет локальный IP-адрес компьютера в сети"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Используем публичный адрес для инициализации интерфейса (соединение не устанавливается)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = "127.0.0.1"
+    finally:
+        s.close()
+    return ip
+
+# Корневая папка с контентом
 MEDIA_ROOT: Path = Path(__file__).resolve().parent / "tv_content"
 
-# Где поднимем сервер
+# Параметры запуска сервера
 HOST: str = "0.0.0.0"
 PORT: int = 8000
 
-# Разрешённые расширения видео (можно дополнять)
+# Разрешённые расширения файлов
 ALLOWED_EXTENSIONS = {
     ".mp4",
     ".mkv",
@@ -21,6 +35,5 @@ ALLOWED_EXTENSIONS = {
     ".webp"
 }
 
-# Если хочешь жёстко задать базовый URL (обычно НЕ нужно):
-# PUBLIC_BASE_URL = "http://192.168.0.10:8000"
-PUBLIC_BASE_URL: str | None = None
+# Автоматическая генерация базового URL на основе текущего IP
+PUBLIC_BASE_URL: str = f"http://{get_local_ip()}:{PORT}"
