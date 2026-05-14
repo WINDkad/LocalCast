@@ -43,17 +43,13 @@ app.add_middleware(
     secret_key=SECRET_KEY
 )
 
-# =========================================================
-# STATIC + TEMPLATES
-# =========================================================
+# ========================= STATIC + TEMPLATES =========================
 
 templates = Jinja2Templates(
     directory="templates"
 )
 
-# =========================================================
-# DIRECTORIES
-# =========================================================
+# ========================= DIRECTORIES =========================
 
 COMMON_DIR = MEDIA_ROOT / "common"
 
@@ -81,9 +77,7 @@ IMAGE_EXTENSIONS = {
 def is_authenticated(request: Request) -> bool:
     return request.session.get("admin") is True
 
-# =========================================================
-# LOGIN
-# =========================================================
+# ========================= LOGIN =========================
 
 @app.get("/login")
 def login_page(request: Request):
@@ -135,9 +129,7 @@ def logout(request: Request):
         status_code=302
     )
 
-# =========================================================
-# ADMIN PANEL
-# =========================================================
+# ========================= ADMIN PANEL =========================
 
 @app.get("/admin")
 def admin_panel(request: Request):
@@ -166,9 +158,7 @@ def admin_panel(request: Request):
         }
     )
 
-# =========================================================
-# UPLOAD
-# =========================================================
+# ========================= UPLOAD =========================
 
 @app.post("/admin/upload")
 def upload(
@@ -188,9 +178,7 @@ def upload(
 
     return {"ok": True}
 
-# =========================================================
-# DELETE FILE
-# =========================================================
+# ========================= DELETE FILE =========================
 
 @app.delete("/admin/delete/{filename}")
 def delete_file(
@@ -209,7 +197,7 @@ def delete_file(
     return {"deleted": True}
 
 
-# Delete all uploaded files
+# ========================= Delete all uploaded files =========================
 
 @app.delete("/admin/delete-all")
 def delete_all_files(request: Request):
@@ -224,7 +212,7 @@ def delete_all_files(request: Request):
 
     return {"deleted": True}
 
-# Playlist API
+# ========================= Playlist API =========================
 
 @app.get("/api/videos")
 def api_videos():
@@ -253,9 +241,7 @@ def api_videos():
 
     return JSONResponse(media)
 
-# =========================================================
-# PLAYER
-# =========================================================
+# ========================= PLAYER =========================
 
 @app.get("/player")
 def player(request: Request):
@@ -267,7 +253,7 @@ def player(request: Request):
         }
     )
 
-# Media streaming endpoint
+# ========================= Media streaming endpoint =========================
 
 @app.get("/media/common/{filename}")
 def media_common(filename: str):
@@ -288,16 +274,14 @@ def media_common(filename: str):
 
     return FileResponse(path)
 
-# =========================================================
-# HEALTH
-# =========================================================
+# ========================= HEALTH =========================
 
 @app.get("/health")
 def health():
 
     return {"status": "ok"}
 
-# Local development entrypoint
+# ========================= Local development entrypoint =========================
 
 if __name__ == "__main__":
 

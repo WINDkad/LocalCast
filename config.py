@@ -31,11 +31,11 @@ ALLOWED_EXTENSIONS = (
     IMAGE_EXTENSIONS
 )
 
-# Admin credentials
+# ========================= Admin credentials =========================
 
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "123123"
 
-# Secret key for session cookies
+# ========================= Secret key for session cookies =========================
 
 SECRET_KEY = "localcast_secret_key"
