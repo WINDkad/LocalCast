@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>LocalCast Player</title>
+
+    <style>
+
+        body {
+            margin: 0;
+            background: black;
+            overflow: hidden;
+            font-family: Arial;
+        }
+
+        #playerContainer {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+            background: black;
+        }
+
+        #player {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: black;
+        }
+
+        #imageViewer {
+
+        display: none;
+
+        width: 100%;
+        height: 100%;
+
+        object-fit: contain;
+
+        background: black;
+        }
+
+        #controls {
+
+            position: absolute;
+
+            bottom: 34px;
+
+            left: 50%;
+
+            transform: translateX(-50%);
+
+            display: flex;
+            align-items: center;
+
+            gap: 10px;
+
+            z-index: 999999;
+
+            transition: opacity 0.3s;
+        }
+
+        .btn {
+
+            position: relative;
+
+            width: 48px;
+            height: 48px;
+
+            border: none;
+
+            border-radius: 50%;
+
+            cursor: pointer;
+
+            background: rgba(255,255,255,0.10);
+
+            color: rgba(255,255,255,0.72);
+
+            font-size: 18px;
+
+            transition: 0.2s;
+
+            backdrop-filter: blur(8px);
+        }
+
+        .btn:hover {
+
+            background: rgba(255,255,255,0.22);
+
+            color: white;
+        }
+
+        .btn.active {
+
+            color: white;
+
+            background: rgba(255,255,255,0.32);
+
+            box-shadow:
+                inset 0 0 0 1px rgba(255,255,255,0.28),
+                0 0 12px rgba(255,255,255,0.10);
+        }
+
+        #repeatBtn.active {
+            transform: scale(1.12);
+        }
+
+        #repeatBtn,
+        #shuffleBtn {
+            font-size: 20px;
+        }
+
+        .repeat-one::after {
+
+            content: "1";
+
+            position: absolute;
+
+            right: 11px;
+            bottom: 8px;
+
+            font-size: 11px;
+
+            font-weight: bold;
+
+            color: white;
+        }
+
+        #controls.hidden {
+
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #placeholder {
+
+            display: none;
+
+            width: 100%;
+            height: 100%;
+
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+
+            color: white;
+
+            background: #020617;
+        }
+
+        #placeholder h1 {
+
+            font-size: 42px;
+
+            margin-bottom: 12px;
+        }
+
+        #placeholder p {
+
+            font-size: 18px;
+
+            color: #94a3b8;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div id="playerContainer">
+
+        <video
+            id="player"
+            controls
+            autoplay
+            playsinline>
+        </video>
+
+        <img id="imageViewer">
+
+        <div id="placeholder">
+
+            <h1>LocalCast</h1>
+
+            <p>
+                Трансляция завершена
+            </p>
+
+        </div>
+
+        <div id="controls">
+
+            <button id="prevBtn" class="btn">
+                ⏮
+            </button>
+
+            <button id="shuffleBtn" class="btn">
+                ⇄
+            </button>
+
+            <button id="playPauseBtn" class="btn">
+                ▶
+            </button>
+
+            <button id="repeatBtn" class="btn">
+                ↻
+            </button>
+
+            <button id="nextBtn" class="btn">
+                ⏭
+            </button>
+
+        </div>
+
+    </div>
+
+    <script>
+
+        let videos = [];
+
+        let currentIndex = 0;
+
+        let shuffleMode = false;
+
+        let repeatMode = 0;
+
+        const player = document.getElementById("player");
+
+        const imageViewer = document.getElementById("imageViewer");
+
+        const placeholder = document.getElementById("placeholder");
+
+        const shuffleBtn = document.getElementById("shuffleBtn");
+
+        const repeatBtn = document.getElementById("repeatBtn");
+
+        const controls = document.getElementById("controls");
+
+        const playPauseBtn = document.getElementById("playPauseBtn");
+
+        const prevBtn = document.getElementById("prevBtn");
+
+        const nextBtn = document.getElementById("nextBtn");
+
+        const container = document.getElementById("playerContainer");
+
+        let hideTimeout = null;
+
+        let imageTimeout = null;
+
+        async function loadPlaylist() {
+
+            const response = await fetch("/api/videos");
+
+            videos = await response.json();
+
+            if (videos.length === 0) {
+
+                showPlaceholder(
+                    "Нет видео",
+                    "Загрузите файлы через админку"
+                );
+
+                return;
+            }
+
+            playVideo(currentIndex);
+        }
+
+       function playVideo(index) {
+
+            clearTimeout(imageTimeout);
+
+            placeholder.style.display = "none";
+
+            controls.style.display = "flex";
+
+            const item = videos[index];
+
+            // Video playback
+            if (item.type === "video") {
+
+                imageViewer.style.display = "none";
+
+                player.style.display = "block";
+
+                player.src = item.url;
+
+                player.play();
+
+                return;
+            }
+
+            // Image slideshow
+            if (item.type === "image") {
+
+                player.pause();
+
+                player.style.display = "none";
+
+                imageViewer.style.display = "block";
+
+                imageViewer.src = item.url;
+
+                imageTimeout = setTimeout(() => {
+
+                    if (shuffleMode) {
+
+                        currentIndex = Math.floor(
+                            Math.random() * videos.length
+                        );
+
+                    } else {
+
+                        currentIndex++;
+
+                        if (currentIndex >= videos.length) {
+
+                            if (repeatMode === 1) {
+
+                                currentIndex = 0;
+
+                            } else {
+
+                                showPlaceholder(
+                                    "Трансляция завершена",
+                                    "Повтор отключён"
+                                );
+
+                                return;
+                            }
+                        }
+                    }
+
+                    playVideo(currentIndex);
+
+                }, 10000);
+            }
+        }
+
+
+        function showPlaceholder(title, text) {
+
+        player.style.display = "none";
+
+        imageViewer.style.display = "none";
+
+        controls.style.display = "none";
+
+        placeholder.style.display = "flex";
+
+        placeholder.innerHTML = `
+            <h1>${title}</h1>
+            <p>${text}</p>
+        `;
+        }
+
+        player.addEventListener("ended", () => {
+
+            if (repeatMode === 2) {
+
+                player.currentTime = 0;
+
+                player.play();
+
+                return;
+            }
+
+            if (shuffleMode) {
+
+                currentIndex = Math.floor(
+                    Math.random() * videos.length
+                );
+
+                playVideo(currentIndex);
+
+                return;
+            }
+
+            currentIndex++;
+
+            if (currentIndex >= videos.length) {
+
+                if (repeatMode === 1) {
+
+                    currentIndex = 0;
+
+                    playVideo(currentIndex);
+
+                } else {
+
+                    showPlaceholder(
+                        "Трансляция завершена",
+                        "Повтор отключён"
+                    );
+                }
+
+                return;
+            }
+
+            playVideo(currentIndex);
+
+        });
+
+        shuffleBtn.addEventListener("click", () => {
+
+            shuffleMode = !shuffleMode;
+
+            shuffleBtn.classList.toggle(
+                "active",
+                shuffleMode
+            );
+        });
+
+        repeatBtn.addEventListener("click", () => {
+
+            repeatMode++;
+
+            if (repeatMode > 2) {
+                repeatMode = 0;
+            }
+
+            repeatBtn.classList.remove("active");
+            repeatBtn.classList.remove("repeat-one");
+
+            if (repeatMode === 1) {
+                repeatBtn.classList.add("active");
+            }
+
+            if (repeatMode === 2) {
+
+                repeatBtn.classList.add("active");
+                repeatBtn.classList.add("repeat-one");
+            }
+
+        });
+
+        prevBtn.addEventListener("click", () => {
+
+            currentIndex--;
+
+            if (currentIndex < 0) {
+                currentIndex = videos.length - 1;
+            }
+
+            playVideo(currentIndex);
+
+        });
+
+        nextBtn.addEventListener("click", () => {
+
+            currentIndex++;
+
+            if (currentIndex >= videos.length) {
+                currentIndex = 0;
+            }
+
+            playVideo(currentIndex);
+
+        });
+
+        playPauseBtn.addEventListener("click", () => {
+
+            if (player.paused) {
+
+                player.play();
+
+            } else {
+
+                player.pause();
+            }
+
+        });
+
+        player.addEventListener("play", () => {
+            playPauseBtn.innerHTML = "❚❚";
+        });
+
+        player.addEventListener("pause", () => {
+            playPauseBtn.innerHTML = "▶";
+        });
+
+        function showControls() {
+
+            controls.classList.remove("hidden");
+
+            clearTimeout(hideTimeout);
+
+            hideTimeout = setTimeout(() => {
+
+                controls.classList.add("hidden");
+
+            }, 2500);
+        }
+
+        document.addEventListener("mousemove", showControls);
+
+        document.addEventListener("click", showControls);
+
+        document.addEventListener("touchstart", showControls);
+
+        document.addEventListener("keydown", async (e) => {
+
+            const activeTag =
+                document.activeElement.tagName.toLowerCase();
+
+            if (activeTag === "input") {
+                return;
+            }
+
+            if (e.code === "Space") {
+
+                e.preventDefault();
+
+                if (player.paused) {
+
+                    await player.play();
+
+                } else {
+
+                    player.pause();
+                }
+            }
+
+            if (e.code === "ArrowRight") {
+                nextBtn.click();
+            }
+
+            if (e.code === "ArrowLeft") {
+                prevBtn.click();
+            }
+
+            if (e.key.toLowerCase() === "f") {
+
+                e.preventDefault();
+
+                if (!document.fullscreenElement) {
+
+                    await container.requestFullscreen();
+
+                } else {
+
+                    await document.exitFullscreen();
+                }
+            }
+        });
+
+        showControls();
+
+        loadPlaylist();
+
+    </script>
+
+</body>
+
+</html>
