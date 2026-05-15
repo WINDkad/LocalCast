@@ -515,16 +515,18 @@
 
             if (e.code === "Space") {
 
-                e.preventDefault();
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
 
-                if (player.paused) {
+            if (player.paused) {
 
-                    await player.play();
+                await player.play();
 
-                } else {
+            } else {
 
-                    player.pause();
-                }
+                player.pause();
+            }
             }
 
             if (e.code === "ArrowRight") {

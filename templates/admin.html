@@ -170,51 +170,57 @@
 
         <!-- Uploaded files -->
 
-        {% if files %}
+        <div id="filesList">
 
-            {% for name in files %}
+            {% if files %}
 
-                <div style='
-                    display:flex;
-                    justify-content:space-between;
-                    align-items:center;
-                    background:#f8fafc;
-                    padding:12px 16px;
-                    border-radius:12px;
-                    margin-bottom:10px;
-                    border:1px solid #e2e8f0;
-                '>
+                {% for name in files %}
 
-                    <span style='font-size:15px;color:#1e293b;'>
-                        {{ name }}
-                    </span>
+                    <div class="file-card"
+                         data-filename="{{ name }}"
+                         style='
+                            display:flex;
+                            justify-content:space-between;
+                            align-items:center;
+                            background:#f8fafc;
+                            padding:12px 16px;
+                            border-radius:12px;
+                            margin-bottom:10px;
+                            border:1px solid #e2e8f0;
+                         '>
 
-                    <a href="#"
-                       onclick="deleteFile('{{ name }}')"
-                       style='
-                            text-decoration:none;
-                            color:white;
-                            background:#dc2626;
-                            padding:8px 14px;
-                            border-radius:8px;
-                            font-size:14px;
-                       '>
+                        <span style='font-size:15px;color:#1e293b;'>
+                            {{ name }}
+                        </span>
 
-                        Удалить
+                        <a href="#"
+                           onclick="deleteFile('{{ name }}')"
+                           style='
+                                text-decoration:none;
+                                color:white;
+                                background:#dc2626;
+                                padding:8px 14px;
+                                border-radius:8px;
+                                font-size:14px;
+                           '>
 
-                    </a>
+                            Удалить
 
-                </div>
+                        </a>
 
-            {% endfor %}
+                    </div>
 
-        {% else %}
+                {% endfor %}
 
-            <p>
-                Файлы пока не загружены
-            </p>
+            {% else %}
 
-        {% endif %}
+                <p id="emptyText">
+                    Файлы пока не загружены
+                </p>
+
+            {% endif %}
+
+        </div>
 
     </div>
 
@@ -238,7 +244,7 @@
 
                 notification.style.display = "none";
 
-            }, 2500);
+            }, 3000);
         }
 
         async function deleteFile(filename) {
@@ -257,9 +263,28 @@
                     "#dc2626"
                 );
 
-                setTimeout(() => {
-                    location.reload();
-                }, 700);
+                const fileCard =
+                    document.querySelector(
+                        `[data-filename="${filename}"]`
+                    );
+
+                if (fileCard) {
+                    fileCard.remove();
+                }
+
+                const filesList =
+                    document.getElementById("filesList");
+
+                if (
+                    filesList.querySelectorAll(".file-card").length === 0
+                ) {
+
+                    filesList.innerHTML = `
+                        <p id="emptyText">
+                            Файлы пока не загружены
+                        </p>
+                    `;
+                }
             }
         }
 
@@ -279,9 +304,14 @@
                     "#dc2626"
                 );
 
-                setTimeout(() => {
-                    location.reload();
-                }, 700);
+                const filesList =
+                    document.getElementById("filesList");
+
+                filesList.innerHTML = `
+                    <p id="emptyText">
+                        Файлы пока не загружены
+                    </p>
+                `;
             }
         }
 
@@ -307,9 +337,59 @@
                         "Файлы успешно загружены"
                     );
 
-                    setTimeout(() => {
-                        location.reload();
-                    }, 700);
+                    const filesInput =
+                        this.querySelector('input[name="files"]');
+
+                    const filesList =
+                        document.getElementById("filesList");
+
+                    const emptyText =
+                        document.getElementById("emptyText");
+
+                    if (emptyText) {
+                        emptyText.remove();
+                    }
+
+                    for (const file of filesInput.files) {
+
+                        filesList.innerHTML += `
+                            <div class="file-card"
+                                 data-filename="${file.name}"
+                                 style='
+                                    display:flex;
+                                    justify-content:space-between;
+                                    align-items:center;
+                                    background:#f8fafc;
+                                    padding:12px 16px;
+                                    border-radius:12px;
+                                    margin-bottom:10px;
+                                    border:1px solid #e2e8f0;
+                                 '>
+
+                                <span style='font-size:15px;color:#1e293b;'>
+                                    ${file.name}
+                                </span>
+
+                                <a href="#"
+                                   onclick="deleteFile('${file.name}')"
+                                   style='
+                                        text-decoration:none;
+                                        color:white;
+                                        background:#dc2626;
+                                        padding:8px 14px;
+                                        border-radius:8px;
+                                        font-size:14px;
+                                   '>
+
+                                    Удалить
+
+                                </a>
+
+                            </div>
+                        `;
+                    }
+
+                    this.reset();
                 }
             });
 
