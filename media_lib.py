@@ -1,61 +1,289 @@
 from __future__ import annotations
 
+import json
 import os
+import re
 
 from dataclasses import dataclass
 from pathlib import Path
 
-from config import ALLOWED_EXTENSIONS, MEDIA_ROOT
+from config import (
+    ALLOWED_EXTENSIONS,
+    COMMON_FOLDER,
+    FOLDERS_META_FILE,
+    MEDIA_ROOT,
+    CREDENTIALS_FILE
+)
 
+# =========================================================
+# MODELS
+# =========================================================
 
 @dataclass(frozen=True)
 class MediaItem:
-    scope: str
-    tv_id: str | None
+
+    folder_id: str
+
     filename: str
 
 
-def _is_allowed_media(path: Path) -> bool:
-    return path.is_file() and path.suffix.lower() in ALLOWED_EXTENSIONS
+# =========================================================
+# VALIDATION
+# =========================================================
+
+def is_valid_folder_name(name: str) -> bool:
+
+    return bool(
+        re.fullmatch(r"[a-zA-Z0-9_-]+", name)
+    )
 
 
-def list_common_items() -> list[MediaItem]:
-    common_dir = MEDIA_ROOT / "common"
+# =========================================================
+# FOLDERS META
+# =========================================================
 
-    if not common_dir.exists():
+def load_folders_meta() -> dict[str, str]:
+
+    if not FOLDERS_META_FILE.exists():
+
+        return {
+            COMMON_FOLDER: "Common"
+        }
+
+    with open(
+        FOLDERS_META_FILE,
+        "r",
+        encoding="utf-8"
+    ) as f:
+
+        return json.load(f)
+
+
+def save_folders_meta(
+    data: dict[str, str]
+):
+
+    MEDIA_ROOT.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    with open(
+        FOLDERS_META_FILE,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,
+            indent=4
+        )
+
+
+# =========================================================
+# INITIALIZATION
+# =========================================================
+
+def ensure_system_folders():
+
+    MEDIA_ROOT.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    common_dir = MEDIA_ROOT / COMMON_FOLDER
+
+    common_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    meta = load_folders_meta()
+
+    if COMMON_FOLDER not in meta:
+
+        meta[COMMON_FOLDER] = "Common"
+
+        save_folders_meta(meta)
+
+
+# =========================================================
+# FOLDER MANAGEMENT
+# =========================================================
+
+def create_folder(
+    folder_id: str,
+    display_name: str
+):
+
+    if not is_valid_folder_name(folder_id):
+
+        raise ValueError(
+            "Invalid folder name"
+        )
+
+    path = MEDIA_ROOT / folder_id
+
+    path.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    meta = load_folders_meta()
+
+    meta[folder_id] = display_name
+
+    save_folders_meta(meta)
+
+
+def delete_folder(folder_id: str):
+
+    if folder_id == COMMON_FOLDER:
+
+        raise ValueError(
+            "Cannot delete common folder"
+        )
+
+    folder_path = MEDIA_ROOT / folder_id
+
+    if folder_path.exists():
+
+        for file in folder_path.iterdir():
+
+            if file.is_file():
+                file.unlink()
+
+        folder_path.rmdir()
+
+    meta = load_folders_meta()
+
+    meta.pop(folder_id, None)
+
+    save_folders_meta(meta)
+
+
+# =========================================================
+# MEDIA
+# =========================================================
+
+def list_folder_items(
+    folder_id: str
+) -> list[MediaItem]:
+
+    folder_path = MEDIA_ROOT / folder_id
+
+    if not folder_path.exists():
         return []
 
-    files = [p for p in common_dir.iterdir() if _is_allowed_media(p)]
+    files = []
 
-    files.sort(key=lambda p: p.name.lower())
+    for file in folder_path.iterdir():
+
+        if (
+            file.is_file() and
+            file.suffix.lower() in ALLOWED_EXTENSIONS
+        ):
+
+            files.append(file)
+
+    files.sort(
+        key=lambda x: x.name.lower()
+    )
 
     return [
         MediaItem(
-            scope="common",
-            tv_id=None,
-            filename=p.name
+            folder_id=folder_id,
+            filename=file.name
         )
-        for p in files
+        for file in files
     ]
 
-def safe_resolve_media_path(scope: str, tv_id: str | None, filename: str) -> Path:
 
-    if scope not in {"common", "tv"}:
-        raise ValueError("Invalid scope")
+# =========================================================
+# PATH SAFETY
+# =========================================================
 
-    if scope == "common":
-        base_dir = MEDIA_ROOT / "common"
-    else:
-        if not tv_id:
-            raise ValueError("tv_id is required")
+def safe_resolve_media_path(
+    folder_id: str,
+    filename: str
+) -> Path:
 
-        base_dir = MEDIA_ROOT / f"tv_{tv_id}"
+    base_dir = (
+        MEDIA_ROOT / folder_id
+    ).resolve()
 
-    base_dir = base_dir.resolve()
+    candidate = (
+        base_dir / filename
+    ).resolve()
 
-    candidate = (base_dir / filename).resolve()
+    if str(candidate).startswith(
+        str(base_dir) + os.sep
+    ):
 
-    if str(candidate).startswith(str(base_dir) + os.sep):
         return candidate
 
-    raise PermissionError("Invalid file path")
+    raise PermissionError(
+        "Invalid file path"
+    )
+
+# =========================================================
+# CREDENTIALS
+# =========================================================
+
+def save_credentials(
+    username: str,
+    password: str
+):
+
+    data = {
+        "username": username,
+        "password": password
+    }
+
+    with open(
+        CREDENTIALS_FILE,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,
+            indent=4
+        )
+
+
+def load_credentials():
+
+    if not CREDENTIALS_FILE.exists():
+
+        default_data = {
+            "username": "admin",
+            "password": "admin"
+        }
+
+        with open(
+            CREDENTIALS_FILE,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            json.dump(
+                default_data,
+                f,
+                ensure_ascii=False,
+                indent=4
+            )
+
+        return default_data
+
+    with open(
+        CREDENTIALS_FILE,
+        "r",
+        encoding="utf-8"
+    ) as f:
+
+        return json.load(f)

@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>LocalCast Folder</title>
+
+</head>
+
+<body style="
+    margin:0;
+    background:#f1f5f9;
+    font-family:Arial;
+">
+
+    <!-- Notifications -->
+
+    <div id="notification"
+         style="
+            position:fixed;
+            top:20px;
+            right:20px;
+            background:#16a34a;
+            color:white;
+            padding:14px 18px;
+            border-radius:12px;
+            display:none;
+            z-index:99999;
+            font-size:14px;
+            box-shadow:0 8px 20px rgba(0,0,0,0.15);
+         ">
+    </div>
+
+    <div style="
+        max-width:1000px;
+        margin:40px auto;
+        background:white;
+        border-radius:20px;
+        padding:40px;
+        box-shadow:0 10px 30px rgba(0,0,0,0.08);
+    ">
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:16px;
+            margin-bottom:10px;
+        ">
+
+            <div>
+
+                <h1 style="
+                    margin:0;
+                    font-size:34px;
+                    color:#0f172a;
+                ">
+                    {{ folder_name }}
+                </h1>
+
+                <p style="
+                    color:#64748b;
+                    margin:8px 0 0 0;
+                    font-size:15px;
+                ">
+                    ID папки: {{ folder_id }}
+                </p>
+
+            </div>
+
+            <div style="
+                display:flex;
+                gap:10px;
+                flex-wrap:wrap;
+                justify-content:flex-end;
+            ">
+
+                <a href="/admin"
+                   style="
+                        background:#475569;
+                        color:white;
+                        text-decoration:none;
+                        padding:10px 18px;
+                        border-radius:10px;
+                        font-size:14px;
+                   ">
+
+                    Назад
+
+                </a>
+
+                <a href="/player/{{ folder_id }}"
+                   target="_blank"
+                   style="
+                        background:#16a34a;
+                        color:white;
+                        text-decoration:none;
+                        padding:10px 18px;
+                        border-radius:10px;
+                        font-size:14px;
+                   ">
+
+                    Открыть трансляцию
+
+                </a>
+
+                <a href="/logout"
+                   style="
+                        background:#0f172a;
+                        color:white;
+                        text-decoration:none;
+                        padding:10px 18px;
+                        border-radius:10px;
+                        font-size:14px;
+                   ">
+
+                    Выйти
+
+                </a>
+
+            </div>
+
+        </div>
+
+        <p style="
+            color:#475569;
+            margin-bottom:30px;
+        ">
+            Управление файлами внутри выбранной папки трансляции.
+        </p>
+
+        <!-- Upload media files -->
+
+        <div style="
+            background:#eff6ff;
+            border:1px solid #bfdbfe;
+            padding:24px;
+            border-radius:16px;
+            margin-bottom:30px;
+        ">
+
+            <h2 style="
+                margin-top:0;
+                color:#1d4ed8;
+            ">
+                Загрузка файлов
+            </h2>
+
+            <form id="uploadForm"
+                  enctype="multipart/form-data">
+
+                <input type="file"
+                       name="files"
+                       multiple
+                       required>
+
+                <br><br>
+
+                <button type="submit"
+                        style="
+                            background:#2563eb;
+                            color:white;
+                            border:none;
+                            padding:12px 24px;
+                            border-radius:10px;
+                            cursor:pointer;
+                            font-size:14px;
+                        ">
+
+                    Загрузить
+
+                </button>
+
+            </form>
+
+        </div>
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:16px;
+            flex-wrap:wrap;
+            margin-bottom:20px;
+        ">
+
+            <h2 style="
+                color:#0f172a;
+                margin:0;
+            ">
+                Файлы в папке
+            </h2>
+
+            <button
+                onclick="deleteAllFiles()"
+                style="
+                    background:#dc2626;
+                    color:white;
+                    border:none;
+                    padding:12px 20px;
+                    border-radius:10px;
+                    cursor:pointer;
+                    font-size:14px;
+                ">
+
+                Удалить все файлы
+
+            </button>
+
+        </div>
+
+        <!-- Uploaded files -->
+
+        <div id="filesList">
+
+            {% if files %}
+
+                {% for name in files %}
+
+                    <div class="file-card"
+                         data-filename="{{ name }}"
+                         style='
+                            display:flex;
+                            justify-content:space-between;
+                            align-items:center;
+                            background:#f8fafc;
+                            padding:12px 16px;
+                            border-radius:12px;
+                            margin-bottom:10px;
+                            border:1px solid #e2e8f0;
+                         '>
+
+                        <span style='font-size:15px;color:#1e293b;'>
+                            {{ name }}
+                        </span>
+
+                        <a href="#"
+                           onclick="deleteFile('{{ name }}')"
+                           style='
+                                text-decoration:none;
+                                color:white;
+                                background:#dc2626;
+                                padding:8px 14px;
+                                border-radius:8px;
+                                font-size:14px;
+                           '>
+
+                            Удалить
+
+                        </a>
+
+                    </div>
+
+                {% endfor %}
+
+            {% else %}
+
+                <p id="emptyText">
+                    Файлы пока не загружены
+                </p>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+    <script>
+
+        const folderId = "{{ folder_id }}";
+
+        function showNotification(
+            text,
+            color = "#16a34a"
+        ) {
+
+            const notification =
+                document.getElementById("notification");
+
+            notification.innerText = text;
+
+            notification.style.background = color;
+
+            notification.style.display = "block";
+
+            setTimeout(() => {
+
+                notification.style.display = "none";
+
+            }, 3000);
+        }
+
+
+        async function deleteFile(filename) {
+
+            const response = await fetch(
+                `/admin/folder/${folderId}/delete/${filename}`,
+                {
+                    method: "DELETE"
+                }
+            );
+
+            if (response.ok) {
+
+                showNotification(
+                    "Файл удалён",
+                    "#dc2626"
+                );
+
+                const fileCard =
+                    document.querySelector(
+                        `[data-filename="${filename}"]`
+                    );
+
+                if (fileCard) {
+                    fileCard.remove();
+                }
+
+                const filesList =
+                    document.getElementById("filesList");
+
+                if (
+                    filesList.querySelectorAll(".file-card").length === 0
+                ) {
+
+                    filesList.innerHTML = `
+                        <p id="emptyText">
+                            Файлы пока не загружены
+                        </p>
+                    `;
+                }
+
+                return;
+            }
+
+            showNotification(
+                "Не удалось удалить файл",
+                "#dc2626"
+            );
+        }
+
+
+        async function deleteAllFiles() {
+
+            const response = await fetch(
+                `/admin/folder/${folderId}/delete-all`,
+                {
+                    method: "DELETE"
+                }
+            );
+
+            if (response.ok) {
+
+                showNotification(
+                    "Все файлы удалены",
+                    "#dc2626"
+                );
+
+                const filesList =
+                    document.getElementById("filesList");
+
+                filesList.innerHTML = `
+                    <p id="emptyText">
+                        Файлы пока не загружены
+                    </p>
+                `;
+
+                return;
+            }
+
+            showNotification(
+                "Не удалось удалить файлы",
+                "#dc2626"
+            );
+        }
+
+
+        document
+            .getElementById("uploadForm")
+            .addEventListener("submit", async function(e) {
+
+                e.preventDefault();
+
+                const formData =
+                    new FormData(this);
+
+                const response = await fetch(
+                    `/admin/folder/${folderId}/upload`,
+                    {
+                        method: "POST",
+                        body: formData
+                    }
+                );
+
+                if (response.ok) {
+
+                    showNotification(
+                        "Файлы успешно загружены"
+                    );
+
+                    const filesInput =
+                        this.querySelector('input[name="files"]');
+
+                    const filesList =
+                        document.getElementById("filesList");
+
+                    const emptyText =
+                        document.getElementById("emptyText");
+
+                    if (emptyText) {
+                        emptyText.remove();
+                    }
+
+                    for (const file of filesInput.files) {
+
+                        filesList.innerHTML += `
+                            <div class="file-card"
+                                 data-filename="${file.name}"
+                                 style='
+                                    display:flex;
+                                    justify-content:space-between;
+                                    align-items:center;
+                                    background:#f8fafc;
+                                    padding:12px 16px;
+                                    border-radius:12px;
+                                    margin-bottom:10px;
+                                    border:1px solid #e2e8f0;
+                                 '>
+
+                                <span style='font-size:15px;color:#1e293b;'>
+                                    ${file.name}
+                                </span>
+
+                                <a href="#"
+                                   onclick="deleteFile('${file.name}')"
+                                   style='
+                                        text-decoration:none;
+                                        color:white;
+                                        background:#dc2626;
+                                        padding:8px 14px;
+                                        border-radius:8px;
+                                        font-size:14px;
+                                   '>
+
+                                    Удалить
+
+                                </a>
+
+                            </div>
+                        `;
+                    }
+
+                    this.reset();
+
+                    return;
+                }
+
+                showNotification(
+                    "Не удалось загрузить файлы",
+                    "#dc2626"
+                );
+            });
+
+    </script>
+
+</body>
+
+</html>

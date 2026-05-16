@@ -9,75 +9,77 @@ from fastapi import (
     Request,
     Form
 )
+
 from fastapi.responses import (
     RedirectResponse,
-    JSONResponse,
-    FileResponse
+    FileResponse,
+    JSONResponse
 )
 
-from starlette.middleware.sessions import SessionMiddleware
-
 from fastapi.templating import Jinja2Templates
+
+from starlette.middleware.sessions import (
+    SessionMiddleware
+)
 
 from config import (
     MEDIA_ROOT,
     HOST,
     PORT,
-    ADMIN_USERNAME,
-    ADMIN_PASSWORD,
-    SECRET_KEY
+    COMMON_FOLDER,
+    VIDEO_EXTENSIONS,
+    IMAGE_EXTENSIONS,
+    SECRET_KEY,
+    SESSION_MAX_AGE
 )
 
 from media_lib import (
-    list_common_items,
-    safe_resolve_media_path
+    ensure_system_folders,
+    load_folders_meta,
+    create_folder,
+    delete_folder,
+    list_folder_items,
+    safe_resolve_media_path,
+    load_credentials,
+    save_credentials
 )
+
+# =========================================================
+# APP
+# =========================================================
 
 app = FastAPI(
     title="LocalCast",
-    version="2.0"
+    version="3.0"
 )
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=SECRET_KEY
+    secret_key=SECRET_KEY,
+    max_age=SESSION_MAX_AGE
 )
-
-# ========================= STATIC + TEMPLATES =========================
 
 templates = Jinja2Templates(
     directory="templates"
 )
 
-# ========================= DIRECTORIES =========================
+ensure_system_folders()
 
-COMMON_DIR = MEDIA_ROOT / "common"
+# =========================================================
+# AUTH
+# =========================================================
 
-COMMON_DIR.mkdir(
-    parents=True,
-    exist_ok=True
-)
+def is_authenticated(
+    request: Request
+) -> bool:
 
-VIDEO_EXTENSIONS = {
-    ".mp4",
-    ".mkv",
-    ".avi",
-    ".mov",
-    ".webm",
-    ".m4v"
-}
+    return request.session.get(
+        "admin"
+    ) is True
 
-IMAGE_EXTENSIONS = {
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".webp"
-}
-
-def is_authenticated(request: Request) -> bool:
-    return request.session.get("admin") is True
-
-# ========================= LOGIN =========================
+# =========================================================
+# LOGIN
+# =========================================================
 
 @app.get("/login")
 def login_page(request: Request):
@@ -97,10 +99,11 @@ def login(
     username: str = Form(...),
     password: str = Form(...)
 ):
+    credentials = load_credentials()
 
     if (
-        username == ADMIN_USERNAME and
-        password == ADMIN_PASSWORD
+            username == credentials["username"] and
+            password == credentials["password"]
     ):
 
         request.session["admin"] = True
@@ -129,10 +132,42 @@ def logout(request: Request):
         status_code=302
     )
 
-# ========================= ADMIN PANEL =========================
+@app.post("/admin/change-credentials")
+def change_credentials(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(...)
+):
+
+    if not is_authenticated(request):
+        raise HTTPException(status_code=401)
+
+    if password != confirm_password:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Passwords do not match"
+        )
+
+    save_credentials(
+        username=username,
+        password=password
+    )
+
+    request.session.clear()
+
+    return RedirectResponse(
+        url="/login",
+        status_code=302
+    )
+
+# =========================================================
+# ADMIN ROOT
+# =========================================================
 
 @app.get("/admin")
-def admin_panel(request: Request):
+def admin_page(request: Request):
 
     if not is_authenticated(request):
 
@@ -141,147 +176,313 @@ def admin_panel(request: Request):
             status_code=302
         )
 
-    files = []
-
-    for file in COMMON_DIR.iterdir():
-
-        if file.is_file():
-            files.append(file.name)
-
-    files.sort()
+    folders = load_folders_meta()
 
     return templates.TemplateResponse(
         "admin.html",
         {
             "request": request,
-            "files": files
+            "folders": folders
         }
     )
 
-# ========================= UPLOAD =========================
+# =========================================================
+# CREATE FOLDER
+# =========================================================
 
-@app.post("/admin/upload")
-def upload(
+@app.post("/admin/create-folder")
+def create_new_folder(
     request: Request,
+    folder_name: str = Form(...)
+):
+
+    if not is_authenticated(request):
+        raise HTTPException(status_code=401)
+
+    folders = load_folders_meta()
+
+    new_id = str(
+        max(
+            [
+                int(x)
+                for x in folders.keys()
+                if x.isdigit()
+            ] + [0]
+        ) + 1
+    )
+
+    create_folder(
+        folder_id=new_id,
+        display_name=folder_name
+    )
+
+    return RedirectResponse(
+        url="/admin",
+        status_code=302
+    )
+
+# =========================================================
+# DELETE FOLDER
+# =========================================================
+
+@app.delete("/admin/delete-folder/{folder_id}")
+def remove_folder(
+    request: Request,
+    folder_id: str
+):
+
+    if not is_authenticated(request):
+        raise HTTPException(status_code=401)
+
+    delete_folder(folder_id)
+
+    return {"deleted": True}
+
+# =========================================================
+# FOLDER PAGE
+# =========================================================
+
+@app.get("/admin/folder/{folder_id}")
+def folder_page(
+    request: Request,
+    folder_id: str
+):
+
+    if not is_authenticated(request):
+
+        return RedirectResponse(
+            url="/login",
+            status_code=302
+        )
+
+    folders = load_folders_meta()
+
+    if folder_id not in folders:
+        raise HTTPException(status_code=404)
+
+    items = list_folder_items(folder_id)
+
+    files = [
+        item.filename
+        for item in items
+    ]
+
+    return templates.TemplateResponse(
+        "folder.html",
+        {
+            "request": request,
+            "folder_id": folder_id,
+            "folder_name": folders[folder_id],
+            "files": files,
+            "is_common": (
+                folder_id == COMMON_FOLDER
+            )
+        }
+    )
+
+# =========================================================
+# UPLOAD
+# =========================================================
+
+@app.post("/admin/folder/{folder_id}/upload")
+def upload_files(
+    request: Request,
+    folder_id: str,
     files: list[UploadFile] = File(...)
 ):
 
     if not is_authenticated(request):
         raise HTTPException(status_code=401)
 
+    folder_path = (
+        MEDIA_ROOT / folder_id
+    )
+
+    folder_path.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
     for file in files:
 
-        filepath = COMMON_DIR / file.filename
+        filepath = (
+            folder_path / file.filename
+        )
 
         with open(filepath, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+
+            shutil.copyfileobj(
+                file.file,
+                f
+            )
 
     return {"ok": True}
 
-# ========================= DELETE FILE =========================
+# =========================================================
+# DELETE FILE
+# =========================================================
 
-@app.delete("/admin/delete/{filename}")
+@app.delete(
+    "/admin/folder/{folder_id}/delete/{filename}"
+)
 def delete_file(
     request: Request,
+    folder_id: str,
     filename: str
 ):
 
     if not is_authenticated(request):
         raise HTTPException(status_code=401)
 
-    path = COMMON_DIR / filename
+    path = (
+        MEDIA_ROOT /
+        folder_id /
+        filename
+    )
 
     if path.exists():
         path.unlink()
 
     return {"deleted": True}
 
+# =========================================================
+# DELETE ALL FILES
+# =========================================================
 
-# ========================= Delete all uploaded files =========================
-
-@app.delete("/admin/delete-all")
-def delete_all_files(request: Request):
+@app.delete(
+    "/admin/folder/{folder_id}/delete-all"
+)
+def delete_all_files(
+    request: Request,
+    folder_id: str
+):
 
     if not is_authenticated(request):
         raise HTTPException(status_code=401)
 
-    for file in COMMON_DIR.iterdir():
+    folder_path = (
+        MEDIA_ROOT / folder_id
+    )
 
-        if file.is_file():
-            file.unlink()
+    if folder_path.exists():
+
+        for file in folder_path.iterdir():
+
+            if file.is_file():
+                file.unlink()
 
     return {"deleted": True}
 
-# ========================= Playlist API =========================
+# =========================================================
+# PLAYER API
+# =========================================================
 
-@app.get("/api/videos")
-def api_videos():
+@app.get("/api/media/{folder_id}")
+def api_media(folder_id: str):
 
-    items = list_common_items()
+    items = list_folder_items(folder_id)
 
     media = []
 
     for item in items:
 
-        ext = Path(item.filename).suffix.lower()
+        ext = Path(
+            item.filename
+        ).suffix.lower()
 
         if ext in VIDEO_EXTENSIONS:
 
             media.append({
                 "type": "video",
-                "url": f"/media/common/{item.filename}"
+                "url": (
+                    f"/media/"
+                    f"{folder_id}/"
+                    f"{item.filename}"
+                )
             })
 
         elif ext in IMAGE_EXTENSIONS:
 
             media.append({
                 "type": "image",
-                "url": f"/media/common/{item.filename}"
+                "url": (
+                    f"/media/"
+                    f"{folder_id}/"
+                    f"{item.filename}"
+                )
             })
 
     return JSONResponse(media)
 
-# ========================= PLAYER =========================
+# =========================================================
+# PLAYER
+# =========================================================
 
-@app.get("/player")
-def player(request: Request):
+@app.get("/player/{folder_id}")
+def player_page(
+    request: Request,
+    folder_id: str
+):
+
+    folders = load_folders_meta()
+
+    if folder_id not in folders:
+        raise HTTPException(status_code=404)
 
     return templates.TemplateResponse(
         "player.html",
         {
-            "request": request
+            "request": request,
+            "folder_id": folder_id,
+            "folder_name": folders[folder_id]
         }
     )
 
-# ========================= Media streaming endpoint =========================
+# =========================================================
+# MEDIA
+# =========================================================
 
-@app.get("/media/common/{filename}")
-def media_common(filename: str):
+@app.get("/media/{folder_id}/{filename}")
+def media_file(
+    folder_id: str,
+    filename: str
+):
 
     try:
 
         path = safe_resolve_media_path(
-            "common",
-            None,
+            folder_id,
             filename
         )
 
     except Exception:
-        raise HTTPException(status_code=403)
+
+        raise HTTPException(
+            status_code=403
+        )
 
     if not path.exists():
-        raise HTTPException(status_code=404)
+
+        raise HTTPException(
+            status_code=404
+        )
 
     return FileResponse(path)
 
-# ========================= HEALTH =========================
+# =========================================================
+# HEALTH
+# =========================================================
 
 @app.get("/health")
 def health():
 
-    return {"status": "ok"}
+    return {
+        "status": "ok"
+    }
 
-# ========================= Local development entrypoint =========================
+# =========================================================
+# RUN
+# =========================================================
 
 if __name__ == "__main__":
 
