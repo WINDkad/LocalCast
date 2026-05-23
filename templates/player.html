@@ -252,6 +252,8 @@
 
         let media = [];
 
+        let lastPlaylistHash = "";
+
         let currentIndex = 0;
 
         let shuffleMode = false;
@@ -302,7 +304,31 @@
                 `/api/media/${folderId}`
             );
 
-            media = await response.json();
+            const newMedia =
+                await response.json();
+
+            const newHash =
+                JSON.stringify(newMedia);
+
+            if (
+                lastPlaylistHash &&
+                lastPlaylistHash !== newHash
+            ) {
+
+                media = newMedia;
+
+                lastPlaylistHash = newHash;
+
+                currentIndex = 0;
+
+                playMedia(currentIndex);
+
+                return;
+            }
+
+            lastPlaylistHash = newHash;
+
+            media = newMedia;
 
             if (media.length === 0) {
 
@@ -314,7 +340,13 @@
                 return;
             }
 
-            playMedia(currentIndex);
+            if (
+                !player.src &&
+                imageViewer.style.display !== "block"
+            ) {
+
+                playMedia(currentIndex);
+            }
         }
 
         // =====================================================
@@ -330,6 +362,10 @@
             controls.style.display = "flex";
 
             const item = media[index];
+
+            if (!item) {
+                return;
+            }
 
             if (item.type === "video") {
 
@@ -349,6 +385,12 @@
             if (item.type === "image") {
 
                 player.pause();
+
+                player.currentTime = 0;
+
+                player.removeAttribute("src");
+
+                player.load();
 
                 player.style.display = "none";
 
@@ -370,28 +412,28 @@
 
         function showPlaceholder(title, text) {
 
-        clearTimeout(imageTimeout);
+            clearTimeout(imageTimeout);
 
-        player.pause();
+            player.pause();
 
-        player.currentTime = 0;
+            player.currentTime = 0;
 
-        player.removeAttribute("src");
+            player.removeAttribute("src");
 
-        player.load();
+            player.load();
 
-        player.style.display = "none";
+            player.style.display = "none";
 
-        imageViewer.style.display = "none";
+            imageViewer.style.display = "none";
 
-        controls.style.display = "none";
+            controls.style.display = "none";
 
-        placeholder.style.display = "flex";
+            placeholder.style.display = "flex";
 
-        placeholder.innerHTML = `
-            <h1>${title}</h1>
-            <p>${text}</p>
-        `;
+            placeholder.innerHTML = `
+                <h1>${title}</h1>
+                <p>${text}</p>
+            `;
         }
 
         // =====================================================
@@ -673,6 +715,12 @@
         showControls();
 
         loadPlaylist();
+
+        setInterval(() => {
+
+            loadPlaylist();
+
+        }, 5000);
 
     </script>
 
