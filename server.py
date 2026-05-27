@@ -85,9 +85,9 @@ def is_authenticated(
 def login_page(request: Request):
 
     return templates.TemplateResponse(
-        "login.html",
-        {
-            "request": request,
+        request=request,
+        name="login.html",
+        context={
             "error": None
         }
     )
@@ -99,11 +99,12 @@ def login(
     username: str = Form(...),
     password: str = Form(...)
 ):
+
     credentials = load_credentials()
 
     if (
-            username == credentials["username"] and
-            password == credentials["password"]
+        username == credentials["username"] and
+        password == credentials["password"]
     ):
 
         request.session["admin"] = True
@@ -114,9 +115,9 @@ def login(
         )
 
     return templates.TemplateResponse(
-        "login.html",
-        {
-            "request": request,
+        request=request,
+        name="login.html",
+        context={
             "error": "Неверный логин или пароль"
         }
     )
@@ -131,6 +132,10 @@ def logout(request: Request):
         url="/login",
         status_code=302
     )
+
+# =========================================================
+# CHANGE CREDENTIALS
+# =========================================================
 
 @app.post("/admin/change-credentials")
 def change_credentials(
@@ -179,9 +184,9 @@ def admin_page(request: Request):
     folders = load_folders_meta()
 
     return templates.TemplateResponse(
-        "admin.html",
-        {
-            "request": request,
+        request=request,
+        name="admin.html",
+        context={
             "folders": folders
         }
     )
@@ -268,9 +273,9 @@ def folder_page(
     ]
 
     return templates.TemplateResponse(
-        "folder.html",
-        {
-            "request": request,
+        request=request,
+        name="folder.html",
+        context={
             "folder_id": folder_id,
             "folder_name": folders[folder_id],
             "files": files,
@@ -430,9 +435,9 @@ def player_page(
         raise HTTPException(status_code=404)
 
     return templates.TemplateResponse(
-        "player.html",
-        {
-            "request": request,
+        request=request,
+        name="player.html",
+        context={
             "folder_id": folder_id,
             "folder_name": folders[folder_id]
         }
