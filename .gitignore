@@ -6,6 +6,7 @@ tv_content/*
 !tv_content/.gitkeep
 
 data/credentials.json
+data/folders.json
 
 .idea/
 .DS_Store
