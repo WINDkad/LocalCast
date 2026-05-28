@@ -49,7 +49,7 @@ CREDENTIALS_FILE: Path = (
 
 HOST: str = "0.0.0.0"
 
-PORT: int = 8000
+PORT: int = 8060
 
 # =========================================================
 # MEDIA FORMATS

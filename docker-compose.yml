@@ -3,7 +3,7 @@ services:
     build: .
     container_name: localcast
     ports:
-      - "8000:8000"
+      - "8060:8060"
     volumes:
       - ./tv_content:/app/tv_content
       - ./data:/app/data
